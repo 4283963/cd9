@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>地下矿道三维掘进数字孪生系统</title>
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <div id="app">
+      <canvas id="scene-canvas"></canvas>
+      
+      <div class="info-panel top-left">
+        <div class="panel-header">
+          <h3>掘进状态</h3>
+        </div>
+        <div class="panel-body">
+          <div class="info-item">
+            <span class="label">掘进里程</span>
+            <span class="value" id="mileage">0.00 m</span>
+          </div>
+          <div class="info-item">
+            <span class="label">掘进速度</span>
+            <span class="value" id="speed">0.00 m/min</span>
+          </div>
+          <div class="info-item">
+            <span class="label">刀盘转速</span>
+            <span class="value" id="cutter-speed">0.00 rpm</span>
+          </div>
+          <div class="info-item">
+            <span class="label">总推力</span>
+            <span class="value" id="thrust">0 kN</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="info-panel top-right">
+        <div class="panel-header">
+          <h3>应力监测</h3>
+        </div>
+        <div class="panel-body">
+          <div class="info-item">
+            <span class="label">最大主应力</span>
+            <span class="value stress-high" id="max-stress">0 MPa</span>
+          </div>
+          <div class="info-item">
+            <span class="label">最小主应力</span>
+            <span class="value stress-low" id="min-stress">0 MPa</span>
+          </div>
+          <div class="info-item">
+            <span class="label">平均应力</span>
+            <span class="value" id="avg-stress">0 MPa</span>
+          </div>
+          <div class="color-legend">
+            <div class="legend-bar">
+              <div class="legend-gradient"></div>
+            </div>
+            <div class="legend-labels">
+              <span>低</span>
+              <span>中</span>
+              <span>高</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="info-panel bottom-left">
+        <div class="panel-header">
+          <h3>盾构机位置</h3>
+        </div>
+        <div class="panel-body">
+          <div class="info-item">
+            <span class="label">X 坐标</span>
+            <span class="value" id="pos-x">0.00 m</span>
+          </div>
+          <div class="info-item">
+            <span class="label">Y 坐标</span>
+            <span class="value" id="pos-y">0.00 m</span>
+          </div>
+          <div class="info-item">
+            <span class="label">Z 坐标</span>
+            <span class="value" id="pos-z">0.00 m</span>
+          </div>
+          <div class="info-item">
+            <span class="label">俯仰角</span>
+            <span class="value" id="pitch">0.00°</span>
+          </div>
+          <div class="info-item">
+            <span class="label">偏航角</span>
+            <span class="value" id="yaw">0.00°</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="info-panel bottom-right">
+        <div class="panel-header">
+          <h3>水文地质</h3>
+        </div>
+        <div class="panel-body">
+          <div class="info-item">
+            <span class="label">地下水位</span>
+            <span class="value" id="water-level">-15.00 m</span>
+          </div>
+          <div class="info-item">
+            <span class="label">水压力</span>
+            <span class="value" id="water-pressure">0.15 MPa</span>
+          </div>
+          <div class="info-item">
+            <span class="label">岩层类型</span>
+            <span class="value" id="rock-type">花岗岩</span>
+          </div>
+          <div class="info-item">
+            <span class="label">岩层硬度</span>
+            <span class="value" id="rock-hardness">80 MPa</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="control-panel">
+        <div class="panel-header">
+          <h3>视图控制</h3>
+        </div>
+        <div class="panel-body">
+          <button id="btn-tbm-view" class="btn-control active">盾构视角</button>
+          <button id="btn-side-view" class="btn-control">侧面视角</button>
+          <button id="btn-top-view" class="btn-control">俯视视角</button>
+          <button id="btn-toggle-layers" class="btn-control">岩层开关</button>
+          <button id="btn-toggle-water" class="btn-control">地下水开关</button>
+        </div>
+      </div>
+
+      <div class="status-bar">
+        <span class="status-item">
+          <span class="status-dot connected"></span>
+          <span id="connection-status">已连接</span>
+        </span>
+        <span class="status-item" id="system-time">系统时间: --:--:--</span>
+        <span class="status-item" id="fps">FPS: 60</span>
+      </div>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
