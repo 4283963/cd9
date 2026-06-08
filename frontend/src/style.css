@@ -183,6 +183,40 @@ html, body {
   box-shadow: 0 0 10px rgba(0, 200, 255, 0.3);
 }
 
+.stats-panel {
+  position: absolute;
+  top: 50%;
+  right: 150px;
+  transform: translateY(-50%);
+  background: rgba(10, 20, 40, 0.85);
+  border: 1px solid rgba(0, 200, 100, 0.3);
+  border-radius: 8px;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 4px 20px rgba(0, 200, 100, 0.2);
+  z-index: 10;
+  min-width: 180px;
+  transition: opacity 0.3s, transform 0.3s;
+}
+
+.stats-panel.hidden {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-50%) translateX(20px);
+}
+
+.stats-panel .panel-header {
+  background: linear-gradient(90deg, rgba(0, 200, 100, 0.3), transparent);
+}
+
+.stats-panel .panel-header h3 {
+  color: #00ff88;
+  text-shadow: 0 0 10px rgba(0, 255, 136, 0.5);
+}
+
+.stats-panel .info-item .value {
+  color: #00ffaa;
+}
+
 .status-bar {
   position: absolute;
   bottom: 0;

@@ -126,6 +126,43 @@
           <button id="btn-top-view" class="btn-control">俯视视角</button>
           <button id="btn-toggle-layers" class="btn-control">岩层开关</button>
           <button id="btn-toggle-water" class="btn-control">地下水开关</button>
+          <button id="btn-toggle-stats" class="btn-control active">性能统计</button>
+        </div>
+      </div>
+
+      <div class="stats-panel" id="stats-panel">
+        <div class="panel-header">
+          <h3>性能统计</h3>
+        </div>
+        <div class="panel-body">
+          <div class="info-item">
+            <span class="label">帧率 FPS</span>
+            <span class="value" id="stat-fps">0</span>
+          </div>
+          <div class="info-item">
+            <span class="label">帧时间</span>
+            <span class="value" id="stat-frame-time">0 ms</span>
+          </div>
+          <div class="info-item">
+            <span class="label">隧道段数</span>
+            <span class="value" id="stat-tunnel-segments">0</span>
+          </div>
+          <div class="info-item">
+            <span class="label">顶点总数</span>
+            <span class="value" id="stat-vertices">0</span>
+          </div>
+          <div class="info-item">
+            <span class="label">三角形数</span>
+            <span class="value" id="stat-triangles">0</span>
+          </div>
+          <div class="info-item">
+            <span class="label">Draw Calls</span>
+            <span class="value" id="stat-draw-calls">0</span>
+          </div>
+          <div class="info-item">
+            <span class="label">隧道长度</span>
+            <span class="value" id="stat-tunnel-length">0 m</span>
+          </div>
         </div>
       </div>
 

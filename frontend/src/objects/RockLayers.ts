@@ -12,6 +12,7 @@ export interface RockLayerConfig {
 export interface RockLayersOptions {
   width?: number
   length?: number
+  maxLength?: number
   layers?: RockLayerConfig[]
 }
 
@@ -21,18 +22,29 @@ export class RockLayers {
   public visible: boolean = true
 
   private width: number
-  private length: number
+  private maxLength: number
+  private currentLength: number
   private layerConfigs: RockLayerConfig[]
+  private gridGroup: THREE.Group | null = null
+  private gridMaterial: THREE.LineBasicMaterial | null = null
 
   constructor(options: RockLayersOptions = {}) {
     this.width = options.width ?? 100
-    this.length = options.length ?? 500
+    this.currentLength = options.length ?? 500
+    this.maxLength = options.maxLength ?? 10000
     this.layerConfigs = options.layers ?? this.getDefaultLayers()
 
     this.group = new THREE.Group()
     this.group.name = 'rock-layers'
 
+    this.gridMaterial = new THREE.LineBasicMaterial({
+      color: 0x333344,
+      transparent: true,
+      opacity: 0.3
+    })
+
     this.createLayers()
+    this.createGridLines()
   }
 
   private getDefaultLayers(): RockLayerConfig[] {
@@ -48,8 +60,8 @@ export class RockLayers {
   private createLayers(): void {
     for (const config of this.layerConfigs) {
       const thickness = config.top - config.bottom
-      const geometry = new THREE.BoxGeometry(this.width, thickness, this.length)
-      
+      const geometry = new THREE.BoxGeometry(this.width, thickness, this.maxLength)
+
       const material = new THREE.MeshStandardMaterial({
         color: config.color,
         transparent: true,
@@ -61,48 +73,58 @@ export class RockLayers {
 
       const mesh = new THREE.Mesh(geometry, material)
       mesh.position.y = config.top - thickness / 2
-      mesh.position.z = this.length / 2
+      mesh.position.z = this.maxLength / 2
       mesh.receiveShadow = true
+      mesh.castShadow = false
+      mesh.frustumCulled = true
       mesh.name = config.name
 
       this.layers.set(config.name, mesh)
       this.group.add(mesh)
     }
-
-    this.createGridLines()
   }
 
   private createGridLines(): void {
-    const gridGroup = new THREE.Group()
-    gridGroup.name = 'grid-lines'
+    if (!this.gridMaterial) return
 
-    const gridMaterial = new THREE.LineBasicMaterial({
-      color: 0x333344,
-      transparent: true,
-      opacity: 0.3
-    })
+    this.gridGroup = new THREE.Group()
+    this.gridGroup.name = 'grid-lines'
 
-    for (let z = 0; z <= this.length; z += 20) {
-      const points: THREE.Vector3[] = []
-      points.push(new THREE.Vector3(-this.width / 2, -100, z))
-      points.push(new THREE.Vector3(this.width / 2, -100, z))
-      
+    const gridSpacing = 50
+    const gridCount = Math.ceil(this.maxLength / gridSpacing)
+
+    for (let i = 0; i <= gridCount; i++) {
+      const z = i * gridSpacing
+      if (z > this.maxLength) break
+
+      const points: THREE.Vector3[] = [
+        new THREE.Vector3(-this.width / 2, -100, z),
+        new THREE.Vector3(this.width / 2, -100, z)
+      ]
       const geometry = new THREE.BufferGeometry().setFromPoints(points)
-      const line = new THREE.Line(geometry, gridMaterial)
-      gridGroup.add(line)
+      const line = new THREE.Line(geometry, this.gridMaterial)
+      line.visible = z <= this.currentLength
+      line.name = `grid-z-${i}`
+      line.frustumCulled = true
+      this.gridGroup.add(line)
     }
 
-    for (let x = -this.width / 2; x <= this.width / 2; x += 20) {
-      const points: THREE.Vector3[] = []
-      points.push(new THREE.Vector3(x, -100, 0))
-      points.push(new THREE.Vector3(x, -100, this.length))
-      
+    const xCount = Math.ceil(this.width / 20)
+    for (let i = 0; i <= xCount; i++) {
+      const x = -this.width / 2 + i * 20
+
+      const points: THREE.Vector3[] = [
+        new THREE.Vector3(x, -100, 0),
+        new THREE.Vector3(x, -100, this.currentLength)
+      ]
       const geometry = new THREE.BufferGeometry().setFromPoints(points)
-      const line = new THREE.Line(geometry, gridMaterial)
-      gridGroup.add(line)
+      const line = new THREE.Line(geometry, this.gridMaterial)
+      line.name = `grid-x-${i}`
+      line.frustumCulled = true
+      this.gridGroup.add(line)
     }
 
-    this.group.add(gridGroup)
+    this.group.add(this.gridGroup)
   }
 
   public setLayerOpacity(layerName: string, opacity: number): void {
@@ -130,28 +152,40 @@ export class RockLayers {
   }
 
   public updateLength(length: number): void {
-    this.length = length
-    
-    for (const [name, mesh] of this.layers) {
-      const config = this.layerConfigs.find(l => l.name === name)
-      if (!config) continue
-
-      const thickness = config.top - config.bottom
-      const geometry = new THREE.BoxGeometry(this.width, thickness, this.length)
-      mesh.geometry.dispose()
-      mesh.geometry = geometry
-      mesh.position.z = this.length / 2
+    if (length <= this.currentLength) return
+    if (length > this.maxLength) {
+      length = this.maxLength
     }
 
-    const gridLines = this.group.getObjectByName('grid-lines')
-    if (gridLines) {
-      this.group.remove(gridLines)
-      gridLines.traverse((child) => {
-        if (child instanceof THREE.Line) {
-          child.geometry.dispose()
-        }
-      })
-      this.createGridLines()
+    this.currentLength = length
+    this.updateGridLines(length)
+  }
+
+  private updateGridLines(length: number): void {
+    if (!this.gridGroup) return
+
+    const gridSpacing = 50
+    const gridCount = Math.ceil(this.maxLength / gridSpacing)
+
+    for (let i = 0; i <= gridCount; i++) {
+      const z = i * gridSpacing
+      const line = this.gridGroup.children.find(
+        c => c.name === `grid-z-${i}`
+      ) as THREE.Line
+      if (line) {
+        line.visible = z <= length
+      }
+    }
+
+    const xLines = this.gridGroup.children.filter(c => c.name?.startsWith('grid-x-'))
+    for (const line of xLines) {
+      if (line instanceof THREE.Line) {
+        const positions = line.geometry.attributes.position as THREE.BufferAttribute
+        const posArr = positions.array as Float32Array
+        posArr[5] = length
+        positions.needsUpdate = true
+        line.geometry.computeBoundingSphere()
+      }
     }
   }
 
@@ -163,6 +197,14 @@ export class RockLayers {
     return [...this.layerConfigs]
   }
 
+  public getLength(): number {
+    return this.currentLength
+  }
+
+  public getMaxLength(): number {
+    return this.maxLength
+  }
+
   public dispose(): void {
     for (const mesh of this.layers.values()) {
       mesh.geometry.dispose()
@@ -171,5 +213,17 @@ export class RockLayers {
       }
     }
     this.layers.clear()
+
+    if (this.gridMaterial) {
+      this.gridMaterial.dispose()
+    }
+
+    if (this.gridGroup) {
+      this.gridGroup.traverse((child) => {
+        if (child instanceof THREE.Line) {
+          child.geometry.dispose()
+        }
+      })
+    }
   }
 }

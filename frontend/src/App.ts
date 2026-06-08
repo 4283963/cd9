@@ -22,6 +22,9 @@ export class App {
   private fps: number = 60
   private frameCount: number = 0
   private lastFpsUpdate: number = 0
+  private frameTime: number = 0
+  private lastFrameTime: number = 0
+  private statsVisible: boolean = true
 
   constructor() {
     this.sceneManager = new SceneManager('scene-canvas')
@@ -34,7 +37,9 @@ export class App {
 
     this.tunnel = new Tunnel({
       radius: 5,
-      shape: 'circular'
+      shape: 'circular',
+      segmentLength: 10,
+      initialCapacity: 500
     })
 
     this.tbm = new TBM({
@@ -44,12 +49,14 @@ export class App {
 
     this.rockLayers = new RockLayers({
       width: 100,
-      length: 500
+      length: 500,
+      maxLength: 10000
     })
 
     this.groundWater = new GroundWater({
       width: 100,
       length: 500,
+      maxLength: 10000,
       waterLevel: -15
     })
 
@@ -80,10 +87,10 @@ export class App {
     } else {
       this.tbm.setPosition(0, -20, 0)
       this.tbm.setCutterHeadSpeed(3)
-      for (let i = 0; i < 10; i++) {
-        this.tunnel.addSegment(this.segmentLength)
+      for (let i = 0; i < 20; i++) {
+        this.tunnel.addSegment()
       }
-      this.lastTunnelLength = 10 * this.segmentLength
+      this.lastTunnelLength = 20 * this.tunnel.getSegmentLength()
     }
 
     if (!this.dataManager.isMockMode()) {
@@ -104,11 +111,12 @@ export class App {
     this.tbm.setPosition(worldPos.x, worldPos.y, worldPos.z)
     this.tbm.setCutterHeadSpeed(data.tbmStatus.cutterSpeed)
 
-    const initialSegments = Math.max(10, Math.ceil(data.tbmStatus.mileage / this.segmentLength) + 5)
+    const segLen = this.tunnel.getSegmentLength()
+    const initialSegments = Math.max(20, Math.ceil(data.tbmStatus.mileage / segLen) + 5)
     for (let i = 0; i < initialSegments; i++) {
-      this.tunnel.addSegment(this.segmentLength)
+      this.tunnel.addSegment()
     }
-    this.lastTunnelLength = initialSegments * this.segmentLength
+    this.lastTunnelLength = initialSegments * segLen
 
     if (data.stressData?.stressDistribution) {
       this.tunnel.updateStressData(data.stressData.stressDistribution)
@@ -137,6 +145,7 @@ export class App {
     const btnTopView = document.getElementById('btn-top-view')
     const btnToggleLayers = document.getElementById('btn-toggle-layers')
     const btnToggleWater = document.getElementById('btn-toggle-water')
+    const btnToggleStats = document.getElementById('btn-toggle-stats')
 
     const buttons = [btnTBMView, btnSideView, btnTopView]
     
@@ -171,6 +180,23 @@ export class App {
       this.groundWater.toggle()
       btnToggleWater.classList.toggle('active')
     })
+
+    btnToggleStats?.addEventListener('click', () => {
+      this.toggleStats()
+      btnToggleStats.classList.toggle('active')
+    })
+  }
+
+  private toggleStats(): void {
+    this.statsVisible = !this.statsVisible
+    const statsPanel = document.getElementById('stats-panel')
+    if (statsPanel) {
+      if (this.statsVisible) {
+        statsPanel.classList.remove('hidden')
+      } else {
+        statsPanel.classList.add('hidden')
+      }
+    }
   }
 
   private setView(view: string): void {
@@ -225,14 +251,15 @@ export class App {
 
     this.tunnel.updateStressData(data.stressData.stressDistribution)
 
+    const segLen = this.tunnel.getSegmentLength()
     if (data.tbmStatus.mileage > this.lastTunnelLength) {
       const segmentsToAdd = Math.floor(
-        (data.tbmStatus.mileage - this.lastTunnelLength) / this.segmentLength
+        (data.tbmStatus.mileage - this.lastTunnelLength) / segLen
       )
       for (let i = 0; i < segmentsToAdd; i++) {
-        this.tunnel.addSegment(this.segmentLength)
+        this.tunnel.addSegment()
       }
-      this.lastTunnelLength += segmentsToAdd * this.segmentLength
+      this.lastTunnelLength += segmentsToAdd * segLen
 
       if (this.lastTunnelLength > 400) {
         this.rockLayers.updateLength(Math.max(500, this.lastTunnelLength + 100))
@@ -315,6 +342,7 @@ export class App {
       this.groundWater.update(delta)
       this.updateFPS(delta)
       this.updateCameraFollow()
+      this.updateStats()
     })
 
     this.sceneManager.startAnimation()
@@ -322,6 +350,7 @@ export class App {
 
   private updateFPS(delta: number): void {
     this.frameCount++
+    this.frameTime = delta * 1000
     const now = performance.now()
     
     if (now - this.lastFpsUpdate >= 1000) {
@@ -334,6 +363,45 @@ export class App {
         fpsEl.textContent = 'FPS: ' + this.fps
       }
     }
+  }
+
+  private updateStats(): void {
+    if (!this.statsVisible) return
+
+    const statFps = document.getElementById('stat-fps')
+    const statFrameTime = document.getElementById('stat-frame-time')
+    const statSegments = document.getElementById('stat-tunnel-segments')
+    const statVertices = document.getElementById('stat-vertices')
+    const statTriangles = document.getElementById('stat-triangles')
+    const statDrawCalls = document.getElementById('stat-draw-calls')
+    const statTunnelLength = document.getElementById('stat-tunnel-length')
+
+    if (statFps) statFps.textContent = this.fps.toString()
+    if (statFrameTime) statFrameTime.textContent = this.frameTime.toFixed(1) + ' ms'
+    if (statSegments) statSegments.textContent = this.tunnel.getSegmentCount().toString()
+    if (statVertices) statVertices.textContent = this.formatLargeNumber(this.tunnel.getVertexCount())
+    if (statTriangles) statTriangles.textContent = this.formatLargeNumber(Math.floor(this.tunnel.getTriangleCount()))
+    if (statDrawCalls) statDrawCalls.textContent = this.estimateDrawCalls()
+    if (statTunnelLength) statTunnelLength.textContent = formatNumber(this.tunnel.getTotalLength(), 1) + ' m'
+  }
+
+  private formatLargeNumber(num: number): string {
+    if (num >= 1000000) {
+      return (num / 1000000).toFixed(1) + 'M'
+    } else if (num >= 1000) {
+      return (num / 1000).toFixed(1) + 'K'
+    }
+    return num.toString()
+  }
+
+  private estimateDrawCalls(): string {
+    let count = 0
+    count += 1
+    count += this.tbm.group.children.length
+    count += this.rockLayers.layers.size
+    count += 1
+    count += 3
+    return count.toString()
   }
 
   private updateCameraFollow(): void {
@@ -358,6 +426,7 @@ export class App {
 
   public start(): void {
     console.log('Tunnel Digital Twin System started')
+    console.log('[Performance] Optimized mode: merged geometry + GPU shaders active')
   }
 
   public dispose(): void {
