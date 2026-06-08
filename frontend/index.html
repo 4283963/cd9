@@ -124,9 +124,42 @@
           <button id="btn-tbm-view" class="btn-control active">盾构视角</button>
           <button id="btn-side-view" class="btn-control">侧面视角</button>
           <button id="btn-top-view" class="btn-control">俯视视角</button>
+          <button id="btn-roaming" class="btn-control btn-roaming">小车漫游</button>
           <button id="btn-toggle-layers" class="btn-control">岩层开关</button>
           <button id="btn-toggle-water" class="btn-control">地下水开关</button>
           <button id="btn-toggle-stats" class="btn-control active">性能统计</button>
+        </div>
+      </div>
+
+      <div class="roaming-panel" id="roaming-panel">
+        <div class="panel-header">
+          <h3>🛑 安全巡查模式</h3>
+        </div>
+        <div class="panel-body">
+          <div class="info-item">
+            <span class="label">标记数量</span>
+            <span class="value danger" id="marker-count">0</span>
+          </div>
+          <div class="info-item">
+            <span class="label">当前位置</span>
+            <span class="value" id="roaming-pos">0.00 m</span>
+          </div>
+          <div class="info-item">
+            <span class="label">移动速度</span>
+            <span class="value" id="roaming-speed">0 m/s</span>
+          </div>
+          <div class="controls-hint">
+            <div class="hint-title">操作说明</div>
+            <div class="hint-item"><kbd>W</kbd> 前进</div>
+            <div class="hint-item"><kbd>S</kbd> 后退</div>
+            <div class="hint-item"><kbd>A</kbd> 左移</div>
+            <div class="hint-item"><kbd>D</kbd> 右移</div>
+            <div class="hint-item"><kbd>Shift</kbd> 加速</div>
+            <div class="hint-item"><kbd>鼠标</kbd> 视角</div>
+            <div class="hint-item"><kbd>空格</kbd> 标记塌方</div>
+            <div class="hint-item"><kbd>ESC</kbd> 退出模式</div>
+          </div>
+          <button class="btn-exit" id="btn-exit-roaming">退出巡查模式</button>
         </div>
       </div>
 

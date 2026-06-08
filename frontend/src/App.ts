@@ -4,6 +4,8 @@ import { Tunnel } from './objects/Tunnel'
 import { TBM } from './objects/TBM'
 import { RockLayers } from './objects/RockLayers'
 import { GroundWater } from './objects/GroundWater'
+import { FirstPersonController } from './objects/FirstPersonController'
+import { MineCart } from './objects/MineCart'
 import { DataManager } from './services/DataManager'
 import { CoordinateTransformer, radToDeg, degToRad } from './math/coordinate'
 import { RealTimeData } from './types'
@@ -15,6 +17,8 @@ export class App {
   private tbm: TBM
   private rockLayers: RockLayers
   private groundWater: GroundWater
+  private firstPersonController: FirstPersonController
+  private mineCart: MineCart
   private dataManager: DataManager
   private coordTransformer: CoordinateTransformer
   private lastTunnelLength: number = 0
@@ -25,6 +29,8 @@ export class App {
   private frameTime: number = 0
   private lastFrameTime: number = 0
   private statsVisible: boolean = true
+  private isRoamingMode: boolean = false
+  private lastRoamingPosition: THREE.Vector3 = new THREE.Vector3()
 
   constructor() {
     this.sceneManager = new SceneManager('scene-canvas')
@@ -60,6 +66,23 @@ export class App {
       waterLevel: -15
     })
 
+    this.mineCart = new MineCart({
+      width: 2.2,
+      length: 3.5,
+      height: 1.8
+    })
+
+    this.firstPersonController = new FirstPersonController(
+      this.sceneManager.camera,
+      {
+        moveSpeed: 8,
+        sprintSpeed: 20,
+        mouseSensitivity: 0.002,
+        height: 1.7,
+        tunnelRadius: 5
+      }
+    )
+
     this.dataManager = new DataManager(
       'ws://localhost:3001',
       'http://localhost:3001',
@@ -74,11 +97,16 @@ export class App {
     this.sceneManager.scene.add(this.tbm.group)
     this.sceneManager.scene.add(this.rockLayers.group)
     this.sceneManager.scene.add(this.groundWater.group)
+    this.sceneManager.scene.add(this.mineCart.group)
+    this.sceneManager.scene.add(this.firstPersonController.markerGroup)
+
+    this.mineCart.group.visible = false
 
     this.setupLights()
     this.setupControls()
     this.setupDataCallbacks()
     this.setupAnimation()
+    this.setupFirstPersonCallback()
 
     const initialData = this.dataManager.getCurrentData()
     if (initialData) {
@@ -100,6 +128,12 @@ export class App {
         console.warn('[App] Failed to connect to backend, using fallback data')
       }
     }
+
+    this.firstPersonController.setTunnelBounds(
+      0,
+      Math.max(500, this.lastTunnelLength + 100),
+      5
+    )
 
     this.setView('side')
   }
@@ -146,6 +180,8 @@ export class App {
     const btnToggleLayers = document.getElementById('btn-toggle-layers')
     const btnToggleWater = document.getElementById('btn-toggle-water')
     const btnToggleStats = document.getElementById('btn-toggle-stats')
+    const btnRoaming = document.getElementById('btn-roaming')
+    const btnExitRoaming = document.getElementById('btn-exit-roaming')
 
     const buttons = [btnTBMView, btnSideView, btnTopView]
     
@@ -157,16 +193,19 @@ export class App {
     }
 
     btnTBMView?.addEventListener('click', () => {
+      if (this.isRoamingMode) this.exitRoamingMode()
       setActive(btnTBMView)
       this.setView('tbm')
     })
 
     btnSideView?.addEventListener('click', () => {
+      if (this.isRoamingMode) this.exitRoamingMode()
       setActive(btnSideView)
       this.setView('side')
     })
 
     btnTopView?.addEventListener('click', () => {
+      if (this.isRoamingMode) this.exitRoamingMode()
       setActive(btnTopView)
       this.setView('top')
     })
@@ -185,6 +224,84 @@ export class App {
       this.toggleStats()
       btnToggleStats.classList.toggle('active')
     })
+
+    btnRoaming?.addEventListener('click', () => {
+      if (this.isRoamingMode) {
+        this.exitRoamingMode()
+      } else {
+        this.enterRoamingMode()
+      }
+    })
+
+    btnExitRoaming?.addEventListener('click', () => {
+      this.exitRoamingMode()
+    })
+  }
+
+  private setupFirstPersonCallback(): void {
+    this.firstPersonController.setOnMarkerCallback((marker) => {
+      this.updateMarkerUI()
+    })
+  }
+
+  private enterRoamingMode(): void {
+    this.isRoamingMode = true
+
+    const tbmPos = this.tbm.getPosition()
+    const startZ = Math.max(50, tbmPos.z - 100)
+
+    this.lastRoamingPosition.copy(this.sceneManager.camera.position)
+
+    this.firstPersonController.setPosition(0, -20 + 1.7, startZ)
+    this.firstPersonController.setRotation(0, 0)
+
+    this.firstPersonController.setTunnelBounds(
+      0,
+      Math.max(500, this.lastTunnelLength + 100),
+      5
+    )
+
+    this.mineCart.group.visible = true
+    this.mineCart.setPosition(0, -20 + 0.4, startZ - 1)
+    this.mineCart.setRotation(0)
+
+    this.sceneManager.controls.enabled = false
+    this.firstPersonController.activate()
+
+    const btnRoaming = document.getElementById('btn-roaming')
+    if (btnRoaming) btnRoaming.classList.add('active')
+
+    const roamingPanel = document.getElementById('roaming-panel')
+    if (roamingPanel) roamingPanel.classList.remove('hidden')
+
+    document.addEventListener('keydown', this.handleRoamingKeydown)
+  }
+
+  private exitRoamingMode(): void {
+    this.isRoamingMode = false
+
+    this.sceneManager.controls.enabled = true
+    this.firstPersonController.deactivate()
+
+    this.mineCart.group.visible = false
+
+    const btnRoaming = document.getElementById('btn-roaming')
+    if (btnRoaming) btnRoaming.classList.remove('active')
+
+    const roamingPanel = document.getElementById('roaming-panel')
+    if (roamingPanel) roamingPanel.classList.add('hidden')
+
+    const tbmPos = this.tbm.getPosition()
+    this.sceneManager.controls.target.lerp(tbmPos, 0.01)
+
+    document.removeEventListener('keydown', this.handleRoamingKeydown)
+  }
+
+  private handleRoamingKeydown = (e: KeyboardEvent): void => {
+    if (!this.isRoamingMode) return
+    if (e.code === 'Escape') {
+      this.exitRoamingMode()
+    }
   }
 
   private toggleStats(): void {
@@ -265,6 +382,12 @@ export class App {
         this.rockLayers.updateLength(Math.max(500, this.lastTunnelLength + 100))
         this.groundWater.updateLength(Math.max(500, this.lastTunnelLength + 100))
       }
+
+      this.firstPersonController.setTunnelBounds(
+        0,
+        Math.max(500, this.lastTunnelLength + 100),
+        5
+      )
     }
 
     if (data.groundWater) {
@@ -341,11 +464,61 @@ export class App {
       this.tbm.update(delta)
       this.groundWater.update(delta)
       this.updateFPS(delta)
-      this.updateCameraFollow()
+
+      if (this.isRoamingMode) {
+        this.updateRoaming(delta)
+      } else {
+        this.updateCameraFollow()
+      }
+
       this.updateStats()
+      this.updateRoamingUI()
     })
 
     this.sceneManager.startAnimation()
+  }
+
+  private updateRoaming(delta: number): void {
+    this.firstPersonController.update(delta)
+
+    const camPos = this.firstPersonController.getPosition()
+    const yaw = this.firstPersonController.getYaw()
+
+    const cartOffset = new THREE.Vector3(0, 0, -1.5)
+    cartOffset.applyAxisAngle(new THREE.Vector3(0, 1, 0), yaw)
+
+    this.mineCart.setPosition(
+      camPos.x + cartOffset.x,
+      camPos.y - 1.7 + 0.4,
+      camPos.z + cartOffset.z
+    )
+    this.mineCart.setRotation(yaw)
+
+    const speed = 8
+    this.mineCart.update(delta, speed)
+  }
+
+  private updateRoamingUI(): void {
+    if (!this.isRoamingMode) return
+
+    const posEl = document.getElementById('roaming-pos')
+    const speedEl = document.getElementById('roaming-speed')
+
+    if (posEl) {
+      const pos = this.firstPersonController.getPosition()
+      posEl.textContent = formatNumber(pos.z, 1) + ' m'
+    }
+
+    if (speedEl) {
+      speedEl.textContent = '8 m/s'
+    }
+  }
+
+  private updateMarkerUI(): void {
+    const countEl = document.getElementById('marker-count')
+    if (countEl) {
+      countEl.textContent = this.firstPersonController.getMarkers().length.toString()
+    }
   }
 
   private updateFPS(delta: number): void {
@@ -435,6 +608,8 @@ export class App {
     this.tbm.dispose()
     this.rockLayers.dispose()
     this.groundWater.dispose()
+    this.firstPersonController.dispose()
+    this.mineCart.dispose()
     this.sceneManager.dispose()
   }
 }
